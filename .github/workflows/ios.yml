@@ -1,0 +1,87 @@
+name: iOS Workflow
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build and Test default scheme using simulator
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest-stable'
+          
+      - name: Setup Swift Package Manager cache
+        uses: actions/cache@v3
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+            
+      - name: Create Xcode project
+        run: |
+          mkdir -p AureliusApp
+          cat > AureliusApp/Package.swift << 'EOF'
+          // swift-tools-version:5.5
+          import PackageDescription
+          
+          let package = Package(
+              name: "AureliusApp",
+              platforms: [.iOS(.v15)],
+              products: [
+                  .executable(name: "AureliusApp", targets: ["AureliusApp"])
+              ],
+              dependencies: [],
+              targets: [
+                  .executableTarget(
+                      name: "AureliusApp",
+                      dependencies: [],
+                      path: "../",
+                      exclude: [
+                          "AureliusApp",
+                          ".github",
+                          "README.md"
+                      ]
+                  ),
+                  .testTarget(
+                      name: "AureliusAppTests",
+                      dependencies: ["AureliusApp"],
+                      path: "Tests"
+                  )
+              ]
+          )
+          EOF
+          
+          mkdir -p Tests
+          cat > Tests/AureliusAppTests.swift << 'EOF'
+          import XCTest
+          @testable import AureliusApp
+          
+          final class AureliusAppTests: XCTestCase {
+              func testExample() throws {
+                  // This is a placeholder test. 
+                  // In a real app, you would add meaningful tests here.
+                  XCTAssertEqual(1 + 1, 2)
+              }
+          }
+          EOF
+      
+      - name: Build
+        run: |
+          cd AureliusApp
+          xcodebuild -scheme AureliusApp -destination "platform=iOS Simulator,name=iPhone 14,OS=latest" build CODE_SIGNING_ALLOWED=NO
+        
+      - name: Run tests
+        run: |
+          cd AureliusApp
+          xcodebuild -scheme AureliusApp -destination "platform=iOS Simulator,name=iPhone 14,OS=latest" test CODE_SIGNING_ALLOWED=NO
